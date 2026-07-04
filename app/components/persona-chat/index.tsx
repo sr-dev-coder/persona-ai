@@ -1,54 +1,38 @@
-'use client';
+"use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, Send, Zap, Flame } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 
 const PERSONAS = {
   hitesh: {
-    id: "nova",
+    id: "hitesh",
     name: "Hitesh",
     tagline: "Sharp, structured, strategic",
-    desc: "Breaks problems down, thinks in steps, gets you to a plan fast.",
-    accent: "#4CC9F0",
-    accentDim: "rgba(76,201,240,0.14)",
-    icon: Zap,
-    opener: "Nova here. What are we solving today?",
+    desc: "Breaks problems into steps and gets you to a plan fast.",
+    accent: "#5B8DEF",
+    accentDim: "rgba(91,141,239,0.16)",
+    photo: "/hitesh.jpg", // put the real photo in /public/hitesh.jpg
+    opener: "Hitesh here. What are we solving today?",
   },
   piyush: {
-    id: "ember",
+    id: "piyush",
     name: "Piyush",
-    tagline: "Warm, bold, a little unfiltered",
-    desc: "Thinks out loud, pushes ideas further, isn't afraid of a strong opinion.",
-    accent: "#FF7A45",
-    accentDim: "rgba(255,122,69,0.14)",
-    icon: Flame,
-    opener: "Hey, it's Ember. Say what's actually on your mind.",
+    tagline: "Warm, bold, unfiltered",
+    desc: "Thinks out loud and pushes every idea a little further.",
+    accent: "#D264E8",
+    accentDim: "rgba(210,100,232,0.16)",
+    photo: "/piyush.jpg", // put the real photo in /public/piyush.jpg
+    opener: "Hey, it's Piyush. Say what's actually on your mind.",
   },
 };
 
-// Mock reply generator — swap this for a real fetch("/api/chat") call.
-function mockReply(personaId, userText) {
-  const novaLines = [
-    `Okay. Let's break "${userText.slice(0, 40)}" into three concrete steps and start with the first.`,
-    "Here's the structure I'd use: define the goal, list constraints, then pick the smallest first move.",
-    "Good question — the fastest path here is narrower than it looks. Want me to map it out?",
-  ];
-  const emberLines = [
-    `Honestly? "${userText.slice(0, 40)}" is more interesting than you're giving it credit for.`,
-    "I'd push back a little here — the safe answer isn't the right one. Let's go bolder.",
-    "Love this. My gut says try the version that scares you slightly more.",
-  ];
-  const pool = personaId === "nova" ? novaLines : emberLines;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
 export default function PersonaChat() {
-  const [screen, setScreen] = useState("pick"); // "pick" | "chat"
+  const [screen, setScreen] = useState("pick"); // "pick" | "transitioning" | "chat"
   const [activeId, setActiveId] = useState(null);
+  const [selectingId, setSelectingId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [hoveredCard, setHoveredCard] = useState(null);
   const scrollRef = useRef(null);
 
   const persona = activeId ? PERSONAS[activeId] : null;
@@ -60,31 +44,54 @@ export default function PersonaChat() {
   }, [messages, isTyping]);
 
   function choosePersona(id) {
-    setActiveId(id);
-    setMessages([{ role: "assistant", text: PERSONAS[id].opener }]);
-    setScreen("chat");
+    if (selectingId) return;
+    setSelectingId(id);
+    setTimeout(() => {
+      setActiveId(id);
+      setMessages([{ role: "assistant", text: PERSONAS[id].opener }]);
+      setScreen("chat");
+    }, 480);
   }
 
   function backToPick() {
     setScreen("pick");
     setActiveId(null);
+    setSelectingId(null);
     setMessages([]);
     setInput("");
   }
 
-  function send() {
+  async function send() {
     const text = input.trim();
     if (!text || isTyping) return;
-    setMessages((m) => [...m, { role: "user", text }]);
+    const newMessages = [...messages, { role: "user", text }];
+    setMessages(newMessages);
     setInput("");
     setIsTyping(true);
 
-    // Replace this block with a real API call, e.g.:
-    // const res = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ persona: activeId, messages }) })
-    setTimeout(() => {
-      setMessages((m) => [...m, { role: "assistant", text: mockReply(activeId, text) }]);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona: activeId, messages: newMessages }),
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = "";
+      setMessages((m) => [...m, { role: "assistant", text: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += decoder.decode(value);
+        setMessages((m) => [...m.slice(0, -1), { role: "assistant", text: full }]);
+      }
+    } catch (err) {
+      setMessages((m) => [...m, { role: "assistant", text: "Something went wrong reaching the API. Try again." }]);
+    } finally {
       setIsTyping(false);
-    }, 900 + Math.random() * 600);
+    }
   }
 
   function handleKey(e) {
@@ -95,152 +102,172 @@ export default function PersonaChat() {
   }
 
   return (
-    <div
-      style={{
-        fontFamily: "'Inter', system-ui, sans-serif",
-        background: "#0B0E14",
-        color: "#EDEFF4",
-        width: "100%",
-        height: "640px",
-        borderRadius: "16px",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-      }}
-    >
+    <div className="pc-root">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap');
         * { box-sizing: border-box; }
-        .pc-scroll::-webkit-scrollbar { width: 6px; }
-        .pc-scroll::-webkit-scrollbar-thumb { background: #232838; border-radius: 3px; }
-        .pc-card { transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
-        .pc-card:hover { transform: translateY(-4px); }
-        .pc-send:hover { filter: brightness(1.12); }
-        .pc-send:active { transform: scale(0.94); }
-        .pc-input:focus { outline: none; }
-        @keyframes pc-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+        .pc-root {
+          position: relative;
+          min-height: 100vh;
+          width: 100%;
+          background: linear-gradient(180deg, #05070F 0%, #070A1C 45%, #0A0F2A 75%, #0A0F2A 100%);
+          font-family: 'Inter', system-ui, sans-serif;
+          color: #F4F6FF;
+          overflow: hidden;
+        }
+
+        .pc-aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+        .pc-blob { position: absolute; border-radius: 50%; filter: blur(70px); }
+        .pc-blob-blue { width: 60vw; height: 60vw; left: -15%; bottom: -30%; background: radial-gradient(circle, #3B82F6, transparent 70%); animation: pc-drift-a 14s ease-in-out infinite; }
+        .pc-blob-pink { width: 55vw; height: 55vw; right: -15%; bottom: -25%; background: radial-gradient(circle, #EC4899, transparent 70%); animation: pc-drift-b 17s ease-in-out infinite; }
+        .pc-blob-purple { width: 50vw; height: 50vw; left: 25%; bottom: -35%; background: radial-gradient(circle, #8B5CF6, transparent 70%); animation: pc-drift-c 20s ease-in-out infinite; }
+        @keyframes pc-drift-a { 0%,100% { transform: translate(0,0) scale(1); opacity: .5; } 50% { transform: translate(6%,-8%) scale(1.15); opacity: .7; } }
+        @keyframes pc-drift-b { 0%,100% { transform: translate(0,0) scale(1); opacity: .45; } 50% { transform: translate(-8%,-6%) scale(1.2); opacity: .65; } }
+        @keyframes pc-drift-c { 0%,100% { transform: translate(-50%,0) scale(1); opacity: .4; } 50% { transform: translate(-50%,-10%) scale(1.1); opacity: .6; } }
+
+        .pc-pick-wrap {
+          position: relative; z-index: 1;
+          min-height: 100vh;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          padding: 60px 24px 120px; gap: 56px;
+          transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .pc-pick-wrap.pc-exit { opacity: 0; transform: scale(0.97); pointer-events: none; }
+
+        .pc-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: #9AA3C7; text-align: center; }
+        .pc-headline { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; text-align: center; line-height: 1.15; margin-top: 14px; max-width: 640px; }
+        .pc-headline span { background: linear-gradient(90deg, #5B8DEF, #D264E8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        .pc-cards { display: flex; gap: 32px; flex-wrap: wrap; justify-content: center; }
+        .pc-card {
+          width: 260px; height: 380px; border-radius: 22px; position: relative; overflow: hidden;
+          cursor: pointer; border: 1px solid rgba(255,255,255,0.12); background: #0A0F24;
+          transition: transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease, opacity 0.4s ease;
+        }
+        .pc-card:hover { transform: translateY(-8px); }
+        .pc-card.pc-hitesh:hover { border-color: rgba(91,141,239,0.6); box-shadow: 0 24px 60px -20px rgba(91,141,239,0.5); }
+        .pc-card.pc-piyush:hover { border-color: rgba(210,100,232,0.6); box-shadow: 0 24px 60px -20px rgba(210,100,232,0.5); }
+        .pc-card.pc-picked { transform: scale(1.08); z-index: 2; }
+        .pc-card.pc-unpicked { opacity: 0; transform: scale(0.9) translateY(10px); }
+
+        .pc-photo-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .pc-photo-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #4A5178; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-align: center; }
+        .pc-card.pc-hitesh .pc-photo-fallback { background: radial-gradient(circle at 50% 35%, #17213E, #0A0F24 75%); }
+        .pc-card.pc-piyush .pc-photo-fallback { background: radial-gradient(circle at 50% 35%, #241733, #0A0F24 75%); }
+
+        .pc-card-overlay { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; background: linear-gradient(180deg, transparent, rgba(5,7,15,0.55) 35%, rgba(5,7,15,0.94) 85%); display: flex; flex-direction: column; justify-content: flex-end; padding: 20px 20px 22px; transition: height 0.35s ease; }
+        .pc-card:hover .pc-card-overlay { height: 70%; }
+        .pc-rim { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; opacity: 0.95; }
+        .pc-card.pc-hitesh .pc-rim { background: linear-gradient(90deg, transparent, #5B8DEF, transparent); }
+        .pc-card.pc-piyush .pc-rim { background: linear-gradient(90deg, transparent, #D264E8, transparent); }
+
+        .pc-card-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; }
+        .pc-card-tagline { font-size: 13px; margin-top: 4px; font-weight: 500; }
+        .pc-card.pc-hitesh .pc-card-tagline { color: #7FAAFF; }
+        .pc-card.pc-piyush .pc-card-tagline { color: #E491F0; }
+        .pc-card-desc { font-size: 12.5px; color: #B4BADA; line-height: 1.55; margin-top: 10px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.35s ease, opacity 0.35s ease; }
+        .pc-card:hover .pc-card-desc { max-height: 60px; opacity: 1; }
+        .pc-card-cta { margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #6B7396; letter-spacing: 0.05em; }
+
+        /* ---- CHAT SCREEN ---- */
+        .pc-chat-outer {
+          position: relative; z-index: 1; min-height: 100vh;
+          display: flex; align-items: center; justify-content: center;
+          padding: 24px;
+          opacity: 0; transform: translateY(16px) scale(0.98);
+          animation: pc-enter 0.5s ease forwards;
+        }
+        @keyframes pc-enter { to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        .pc-chat-shell {
+          width: 100%; max-width: 1024px; height: min(720px, 88vh);
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 24px; overflow: hidden;
+          display: grid; grid-template-columns: 380px 1fr;
+        }
+
+        .pc-photo-panel { position: relative; overflow: hidden; }
+        .pc-photo-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 24px; background: linear-gradient(180deg, transparent 40%, rgba(5,7,15,0.9) 100%); pointer-events: none; z-index: 1; }
+        .pc-photo-back { position: absolute; top: 18px; left: 18px; width: 34px; height: 34px; border-radius: 50%; background: rgba(5,7,15,0.55); border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; color: #F4F6FF; cursor: pointer; backdrop-filter: blur(6px); z-index: 2; }
+        .pc-photo-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; }
+        .pc-photo-tagline { font-size: 13px; margin-top: 4px; font-weight: 500; }
+
+        .pc-mobile-bar { display: none; }
+
+        .pc-chat-panel { display: flex; flex-direction: column; min-height: 0; }
+        .pc-seam { height: 2px; flex-shrink: 0; }
+        .pc-messages { flex: 1; overflow-y: auto; padding: 22px 22px; display: flex; flex-direction: column; gap: 12px; }
+        .pc-messages::-webkit-scrollbar { width: 6px; }
+        .pc-messages::-webkit-scrollbar-thumb { background: #232838; border-radius: 3px; }
+
+        .pc-msg-user { align-self: flex-end; max-width: 78%; background: #1B2030; padding: 10px 14px; border-radius: 14px 14px 4px 14px; font-size: 14px; line-height: 1.5; }
+        .pc-msg-bot-row { align-self: flex-start; max-width: 78%; display: flex; gap: 8px; }
+        .pc-msg-bot-bar { width: 3px; border-radius: 2px; flex-shrink: 0; }
+        .pc-msg-bot { padding: 10px 14px; border-radius: 4px 14px 14px 14px; font-size: 14px; line-height: 1.5; }
+
+        .pc-typing { display: flex; gap: 4px; padding: 12px 16px; border-radius: 4px 14px 14px 14px; }
+        .pc-dot { width: 5px; height: 5px; border-radius: 50%; animation: pc-blink 1.1s infinite; }
+        @keyframes pc-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }
+
+        .pc-input-bar { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+        .pc-input-pill { display: flex; align-items: center; gap: 10px; background: #131722; border: 1px solid #232838; border-radius: 999px; padding: 6px 6px 6px 16px; }
+        .pc-input-field { flex: 1; background: transparent; border: none; color: #EDEFF4; font-size: 14px; font-family: 'Inter', sans-serif; }
+        .pc-input-field:focus { outline: none; }
+        .pc-send-btn { width: 34px; height: 34px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .pc-send-btn:hover { filter: brightness(1.12); }
+        .pc-send-btn:active { transform: scale(0.94); }
+
+        @media (max-width: 768px) {
+          .pc-chat-outer { padding: 0; align-items: stretch; }
+          .pc-chat-shell { max-width: 100%; height: 100vh; border-radius: 0; grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+          .pc-photo-panel { display: none; }
+          .pc-mobile-bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
+          .pc-mobile-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+          .pc-mobile-fallback { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; }
+          .pc-mobile-back { background: transparent; border: none; color: #9AA3C7; display: flex; align-items: center; cursor: pointer; padding: 6px; }
+        }
       `}</style>
 
-      {screen === "pick" && (
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "32px 24px",
-            gap: "36px",
-          }}
-        >
-          <div style={{ textAlign: "center" }}>
-            <div
-              style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: "11px",
-                letterSpacing: "0.18em",
-                color: "#8A93A6",
-                textTransform: "uppercase",
-                marginBottom: "10px",
-              }}
-            >
-              Choose your counterpart
-            </div>
-            <div
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 700,
-                fontSize: "26px",
-                background: "linear-gradient(90deg, #4CC9F0, #FF7A45)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              Two minds. One conversation.
+      <div className="pc-aurora">
+        <div className="pc-blob pc-blob-blue" />
+        <div className="pc-blob pc-blob-purple" />
+        <div className="pc-blob pc-blob-pink" />
+      </div>
+
+      {screen !== "chat" && (
+        <div className={`pc-pick-wrap ${selectingId ? "pc-exit" : ""}`}>
+          <div>
+            <div className="pc-eyebrow">choose your guide</div>
+            <div className="pc-headline">
+              Two minds.<br />One <span>glow</span> to think inside.
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "0px", alignItems: "stretch" }}>
-            {Object.values(PERSONAS).map((p, i) => {
-              const Icon = p.icon;
-              const hovered = hoveredCard === p.id;
+          <div className="pc-cards">
+            {Object.values(PERSONAS).map((p) => {
+              const state = !selectingId ? "" : selectingId === p.id ? "pc-picked" : "pc-unpicked";
               return (
-                <div key={p.id} style={{ display: "flex" }}>
-                  <button
-                    className="pc-card"
-                    onMouseEnter={() => setHoveredCard(p.id)}
-                    onMouseLeave={() => setHoveredCard(null)}
-                    onClick={() => choosePersona(p.id)}
-                    style={{
-                      width: "220px",
-                      minHeight: "260px",
-                      background: hovered ? p.accentDim : "#131722",
-                      border: `1px solid ${hovered ? p.accent : "#232838"}`,
-                      borderRadius: "14px",
-                      padding: "26px 20px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-start",
-                      gap: "14px",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      boxShadow: hovered ? `0 12px 28px -12px ${p.accent}66` : "none",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "42px",
-                        height: "42px",
-                        borderRadius: "10px",
-                        background: p.accentDim,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: `1px solid ${p.accent}55`,
-                      }}
-                    >
-                      <Icon size={20} color={p.accent} strokeWidth={2} />
-                    </div>
-                    <div>
-                      <div
-                        style={{
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          fontWeight: 700,
-                          fontSize: "20px",
-                          color: "#EDEFF4",
-                        }}
-                      >
-                        {p.name}
-                      </div>
-                      <div style={{ fontSize: "12px", color: p.accent, marginTop: "2px", fontWeight: 500 }}>
-                        {p.tagline}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: "13px", color: "#8A93A6", lineHeight: 1.5 }}>
-                      {p.desc}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: "auto",
-                        fontSize: "12px",
-                        fontFamily: "'JetBrains Mono', monospace",
-                        color: hovered ? p.accent : "#4A5165",
-                      }}
-                    >
-                      {hovered ? "Tap to start →" : "Tap to start"}
-                    </div>
-                  </button>
-                  {i === 0 && (
-                    <div
-                      style={{
-                        width: "1px",
-                        background:
-                          "linear-gradient(180deg, transparent, #4CC9F055, #FF7A4555, transparent)",
-                        margin: "0 18px",
-                      }}
-                    />
-                  )}
+                <div
+                  key={p.id}
+                  className={`pc-card pc-${p.id} ${state}`}
+                  onClick={() => choosePersona(p.id)}
+                >
+                  <img
+                    src={p.photo}
+                    alt={p.name}
+                    className="pc-photo-fill"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                  <div className="pc-photo-fallback">YOUR PHOTO<br />GOES HERE</div>
+                  <div className="pc-card-overlay">
+                    <div className="pc-card-name">{p.name}</div>
+                    <div className="pc-card-tagline">{p.tagline}</div>
+                    <div className="pc-card-desc">{p.desc}</div>
+                    <div className="pc-card-cta">tap to start →</div>
+                  </div>
+                  <div className="pc-rim" />
                 </div>
               );
             })}
@@ -249,190 +276,92 @@ export default function PersonaChat() {
       )}
 
       {screen === "chat" && persona && (
-        <>
-          {/* Top bar */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              padding: "14px 18px",
-              borderBottom: "1px solid #1B2030",
-              background: "#0E121B",
-            }}
-          >
-            <button
-              onClick={backToPick}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#8A93A6",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                padding: "6px",
-                borderRadius: "8px",
-              }}
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div
-              style={{
-                width: "30px",
-                height: "30px",
-                borderRadius: "8px",
-                background: persona.accentDim,
-                border: `1px solid ${persona.accent}55`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <persona.icon size={15} color={persona.accent} />
-            </div>
-            <div>
-              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: "14px" }}>
-                {persona.name}
-              </div>
-              <div style={{ fontSize: "11px", color: "#8A93A6" }}>{persona.tagline}</div>
-            </div>
-          </div>
-          {/* Accent seam */}
-          <div style={{ height: "2px", background: `linear-gradient(90deg, ${persona.accent}, transparent 60%)` }} />
-
-          {/* Messages */}
-          <div
-            ref={scrollRef}
-            className="pc-scroll"
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "20px 18px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
-          >
-            {messages.map((m, idx) =>
-              m.role === "user" ? (
-                <div key={idx} style={{ alignSelf: "flex-end", maxWidth: "78%" }}>
-                  <div
-                    style={{
-                      background: "#1B2030",
-                      color: "#EDEFF4",
-                      padding: "10px 14px",
-                      borderRadius: "14px 14px 4px 14px",
-                      fontSize: "14px",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {m.text}
-                  </div>
-                </div>
-              ) : (
-                <div key={idx} style={{ alignSelf: "flex-start", maxWidth: "78%", display: "flex", gap: "8px" }}>
-                  <div
-                    style={{
-                      width: "3px",
-                      borderRadius: "2px",
-                      background: persona.accent,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div
-                    style={{
-                      background: persona.accentDim,
-                      color: "#EDEFF4",
-                      padding: "10px 14px",
-                      borderRadius: "4px 14px 14px 14px",
-                      fontSize: "14px",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {m.text}
-                  </div>
-                </div>
-              )
-            )}
-            {isTyping && (
-              <div style={{ alignSelf: "flex-start", display: "flex", gap: "8px" }}>
-                <div style={{ width: "3px", borderRadius: "2px", background: persona.accent }} />
-                <div
-                  style={{
-                    background: persona.accentDim,
-                    padding: "12px 16px",
-                    borderRadius: "4px 14px 14px 14px",
-                    display: "flex",
-                    gap: "4px",
-                  }}
-                >
-                  {[0, 1, 2].map((d) => (
-                    <span
-                      key={d}
-                      style={{
-                        width: "5px",
-                        height: "5px",
-                        borderRadius: "50%",
-                        background: persona.accent,
-                        animation: `pc-blink 1.1s ${d * 0.15}s infinite`,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Input bar */}
-          <div style={{ padding: "14px 18px", borderTop: "1px solid #1B2030", background: "#0E121B" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                background: "#131722",
-                border: "1px solid #232838",
-                borderRadius: "999px",
-                padding: "6px 6px 6px 16px",
-              }}
-            >
-              <input
-                className="pc-input"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder={`Message ${persona.name}...`}
-                style={{
-                  flex: 1,
-                  background: "transparent",
-                  border: "none",
-                  color: "#EDEFF4",
-                  fontSize: "14px",
-                  fontFamily: "'Inter', sans-serif",
-                }}
+        <div className="pc-chat-outer">
+          <div className="pc-chat-shell">
+            {/* Desktop left photo panel */}
+            <div className="pc-photo-panel">
+              <img
+                src={persona.photo}
+                alt={persona.name}
+                className="pc-photo-fill"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
               />
-              <button
-                className="pc-send"
-                onClick={send}
-                disabled={!input.trim() || isTyping}
-                style={{
-                  width: "34px",
-                  height: "34px",
-                  borderRadius: "50%",
-                  border: "none",
-                  background: input.trim() ? persona.accent : "#232838",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: input.trim() ? "pointer" : "default",
-                  flexShrink: 0,
-                }}
-              >
-                <Send size={15} color={input.trim() ? "#0B0E14" : "#4A5165"} />
+              <div className="pc-photo-fallback">YOUR PHOTO<br />GOES HERE</div>
+              <button className="pc-photo-back" onClick={backToPick} aria-label="Back">
+                <ArrowLeft size={16} />
               </button>
+              <div className="pc-photo-overlay">
+                <div className="pc-photo-name">{persona.name}</div>
+                <div className="pc-photo-tagline" style={{ color: persona.accent }}>{persona.tagline}</div>
+              </div>
+            </div>
+
+            {/* Mobile top bar */}
+            <div className="pc-mobile-bar">
+              <button className="pc-mobile-back" onClick={backToPick} aria-label="Back">
+                <ArrowLeft size={18} />
+              </button>
+              <img
+                src={persona.photo}
+                alt={persona.name}
+                className="pc-mobile-avatar"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+              <div>
+                <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: "14px" }}>
+                  {persona.name}
+                </div>
+                <div style={{ fontSize: "11px", color: persona.accent }}>{persona.tagline}</div>
+              </div>
+            </div>
+
+            <div className="pc-chat-panel">
+              <div className="pc-seam" style={{ background: `linear-gradient(90deg, ${persona.accent}, transparent 60%)` }} />
+              <div className="pc-messages" ref={scrollRef}>
+                {messages.map((m, idx) =>
+                  m.role === "user" ? (
+                    <div key={idx} className="pc-msg-user">{m.text}</div>
+                  ) : (
+                    <div key={idx} className="pc-msg-bot-row">
+                      <div className="pc-msg-bot-bar" style={{ background: persona.accent }} />
+                      <div className="pc-msg-bot" style={{ background: persona.accentDim }}>{m.text}</div>
+                    </div>
+                  )
+                )}
+                {isTyping && (
+                  <div className="pc-msg-bot-row">
+                    <div className="pc-msg-bot-bar" style={{ background: persona.accent }} />
+                    <div className="pc-typing" style={{ background: persona.accentDim }}>
+                      {[0, 1, 2].map((d) => (
+                        <span key={d} className="pc-dot" style={{ background: persona.accent, animationDelay: `${d * 0.15}s` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pc-input-bar">
+                <div className="pc-input-pill">
+                  <input
+                    className="pc-input-field"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKey}
+                    placeholder={`Message ${persona.name}...`}
+                  />
+                  <button
+                    className="pc-send-btn"
+                    onClick={send}
+                    disabled={!input.trim() || isTyping}
+                    style={{ background: input.trim() ? persona.accent : "#232838", cursor: input.trim() ? "pointer" : "default" }}
+                  >
+                    <Send size={15} color={input.trim() ? "#0B0E14" : "#4A5165"} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
