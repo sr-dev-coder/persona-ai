@@ -1,10 +1,28 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { ArrowLeft, Send } from "lucide-react";
 
-const PERSONAS = {
+type PersonaId = "hitesh" | "piyush";
+
+type Persona = {
+  id: PersonaId;
+  name: string;
+  tagline: string;
+  desc: string;
+  accent: string;
+  accentDim: string;
+  photo: string;
+  opener: string;
+};
+
+type Message = {
+  role: "user" | "assistant";
+  text: string;
+};
+
+const PERSONAS: Record<PersonaId, Persona> = {
   hitesh: {
     id: "hitesh",
     name: "Hitesh",
@@ -12,7 +30,7 @@ const PERSONAS = {
     desc: "Retired from corporate and full time YouTuber, x founder of LCO (acquired), x CTO, Sr. Director at PW. 2 YT channels (1M & 700k+), stepped into 45 countries",
     accent: "#5B8DEF",
     accentDim: "rgba(91,141,239,0.16)",
-    photo: "/hitesh.png", 
+    photo: "/hitesh.png",
     opener: "Namaste! Main kis cheez mein help kar sakta hoon?",
   },
   piyush: {
@@ -22,21 +40,21 @@ const PERSONAS = {
     desc: "Software Engineer | Tech Content Creator & YouTuber | 395k+ on YouTube | 25k+ Instagram | 110k+ LinkedIn",
     accent: "#D264E8",
     accentDim: "rgba(210,100,232,0.16)",
-    photo: "/piyush.png", 
+    photo: "/piyush.png",
     opener: "Namaste! Main kis cheez mein help kar sakta hoon?",
   },
 };
 
 export default function PersonaChat() {
-  const [screen, setScreen] = useState("pick"); // "pick" | "transitioning" | "chat"
-  const [activeId, setActiveId] = useState(null);
-  const [selectingId, setSelectingId] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef(null);
+  const [screen, setScreen] = useState<"pick" | "chat">("pick");
+  const [activeId, setActiveId] = useState<PersonaId | null>(null);
+  const [selectingId, setSelectingId] = useState<PersonaId | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState<string>("");
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const persona = activeId ? PERSONAS[activeId] : null;
+  const persona: Persona | null = activeId ? PERSONAS[activeId] : null;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -44,7 +62,7 @@ export default function PersonaChat() {
     }
   }, [messages, isTyping]);
 
-  function choosePersona(id) {
+  function choosePersona(id: PersonaId) {
     if (selectingId) return;
     setSelectingId(id);
     setTimeout(() => {
@@ -64,8 +82,8 @@ export default function PersonaChat() {
 
   async function send() {
     const text = input.trim();
-    if (!text || isTyping) return;
-    const newMessages = [...messages, { role: "user", text }];
+    if (!text || isTyping || !activeId) return;
+    const newMessages: Message[] = [...messages, { role: "user", text }];
     setMessages(newMessages);
     setInput("");
     setIsTyping(true);
@@ -76,6 +94,8 @@ export default function PersonaChat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ persona: activeId, messages: newMessages }),
       });
+
+      if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -89,13 +109,16 @@ export default function PersonaChat() {
         setMessages((m) => [...m.slice(0, -1), { role: "assistant", text: full }]);
       }
     } catch (err) {
-      setMessages((m) => [...m, { role: "assistant", text: "Something went wrong reaching the API. Try again." }]);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: "Something went wrong reaching the API. Try again." },
+      ]);
     } finally {
       setIsTyping(false);
     }
   }
 
-  function handleKey(e) {
+  function handleKey(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -104,7 +127,6 @@ export default function PersonaChat() {
 
   return (
     <div className="pc-root">
-     
 
       <div className="pc-aurora">
         <div className="pc-blob pc-blob-blue" />
@@ -118,7 +140,7 @@ export default function PersonaChat() {
             <div className="pc-eyebrow">Choose your guide.</div>
             <div className="pc-headline">
               Different personalities.
-              <br/> The same <span>powerful intelligence.</span>
+              <br /> The same <span>powerful intelligence.</span>
             </div>
           </div>
 
@@ -131,19 +153,16 @@ export default function PersonaChat() {
                   className={`pc-card pc-${p.id} ${state}`}
                   onClick={() => choosePersona(p.id)}
                 >
-                   <div className="pc-photo-fallback"></div>
+                  <div className="pc-photo-fallback" />
                   <Image
                     src={p.photo}
                     alt={p.name}
                     className="pc-photo-fill"
                     width={260}
                     height={380}
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
                   />
-                 
                   <div className="pc-card-overlay">
                     <div className="pc-card-name">{p.name}</div>
-                    {/* <div className="pc-card-tagline">{p.tagline}</div> */}
                     <div className="pc-card-desc">{p.desc}</div>
                     <div className="pc-card-cta">tap to start →</div>
                   </div>
@@ -160,19 +179,15 @@ export default function PersonaChat() {
           <div className="pc-chat-shell">
             {/* Desktop left photo panel */}
             <div className="pc-photo-panel">
-              <img
-                src={persona.photo}
-                alt={persona.name}
-                className="pc-photo-fill"
-                onError={(e) => { e.currentTarget.style.display = "none"; }}
-              />
-              <div className="pc-photo-fallback">YOUR PHOTO<br />GOES HERE</div>
+              <Image src={persona.photo} alt={persona.name} fill className="pc-photo-fill" />
               <button className="pc-photo-back" onClick={backToPick} aria-label="Back">
                 <ArrowLeft size={16} />
               </button>
               <div className="pc-photo-overlay">
                 <div className="pc-photo-name">{persona.name}</div>
-                <div className="pc-photo-tagline" style={{ color: persona.accent }}>{persona.tagline}</div>
+                <div className="pc-photo-tagline" style={{ color: persona.accent }}>
+                  {persona.tagline}
+                </div>
               </div>
             </div>
 
@@ -181,11 +196,12 @@ export default function PersonaChat() {
               <button className="pc-mobile-back" onClick={backToPick} aria-label="Back">
                 <ArrowLeft size={18} />
               </button>
-              <img
+              <Image
                 src={persona.photo}
                 alt={persona.name}
+                width={40}
+                height={40}
                 className="pc-mobile-avatar"
-                onError={(e) => { e.currentTarget.style.display = "none"; }}
               />
               <div>
                 <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: "14px" }}>
@@ -196,15 +212,22 @@ export default function PersonaChat() {
             </div>
 
             <div className="pc-chat-panel">
-              <div className="pc-seam" style={{ background: `linear-gradient(90deg, ${persona.accent}, transparent 60%)` }} />
+              <div
+                className="pc-seam"
+                style={{ background: `linear-gradient(90deg, ${persona.accent}, transparent 60%)` }}
+              />
               <div className="pc-messages" ref={scrollRef}>
                 {messages.map((m, idx) =>
                   m.role === "user" ? (
-                    <div key={idx} className="pc-msg-user">{m.text}</div>
+                    <div key={idx} className="pc-msg-user">
+                      {m.text}
+                    </div>
                   ) : (
                     <div key={idx} className="pc-msg-bot-row">
                       <div className="pc-msg-bot-bar" style={{ background: persona.accent }} />
-                      <div className="pc-msg-bot" style={{ background: persona.accentDim }}>{m.text}</div>
+                      <div className="pc-msg-bot" style={{ background: persona.accentDim }}>
+                        {m.text}
+                      </div>
                     </div>
                   )
                 )}
@@ -213,7 +236,11 @@ export default function PersonaChat() {
                     <div className="pc-msg-bot-bar" style={{ background: persona.accent }} />
                     <div className="pc-typing" style={{ background: persona.accentDim }}>
                       {[0, 1, 2].map((d) => (
-                        <span key={d} className="pc-dot" style={{ background: persona.accent, animationDelay: `${d * 0.15}s` }} />
+                        <span
+                          key={d}
+                          className="pc-dot"
+                          style={{ background: persona.accent, animationDelay: `${d * 0.15}s` }}
+                        />
                       ))}
                     </div>
                   </div>
@@ -233,7 +260,10 @@ export default function PersonaChat() {
                     className="pc-send-btn"
                     onClick={send}
                     disabled={!input.trim() || isTyping}
-                    style={{ background: input.trim() ? persona.accent : "#232838", cursor: input.trim() ? "pointer" : "default" }}
+                    style={{
+                      background: input.trim() ? persona.accent : "#232838",
+                      cursor: input.trim() ? "pointer" : "default",
+                    }}
                   >
                     <Send size={15} color={input.trim() ? "#0B0E14" : "#4A5165"} />
                   </button>

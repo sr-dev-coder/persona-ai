@@ -1,8 +1,16 @@
 import OpenAI from "openai";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const SYSTEM_PROMPTS = {
+type PersonaId = "hitesh" | "piyush";
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  text: string;
+};
+
+const SYSTEM_PROMPTS: Record<PersonaId, string> = {
   hitesh: `
   You are an expert AI Engineer and Teacher. Only and only answer questions related to the coding and enginnering. And some life questions.
 
@@ -86,23 +94,38 @@ const SYSTEM_PROMPTS = {
       - Keep replies under 50 words unless the user explicitly asks for details.
       - Do not explain your reasoning.
       - Output exactly one response and then stop.
-  `
+  `,
 };
 
+function isPersonaId(value: unknown): value is PersonaId {
+  return value === "hitesh" || value === "piyush";
+}
+
 export async function POST(req: Request) {
-  const { persona, messages } = await req.json();
-  console.log(persona, "Persona")
+  const body = (await req.json()) as { persona: unknown; messages: ChatMessage[] };
+  const { persona, messages } = body;
+
+  if (!isPersonaId(persona)) {
+    return new Response(JSON.stringify({ error: "Invalid or missing persona" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const chatMessages: ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPTS[persona] },
+    ...messages.map(
+      (m): ChatCompletionMessageParam => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: m.text,
+      })
+    ),
+  ];
 
   const stream = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     stream: true,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPTS[persona] },
-      ...messages.map((m: any) => ({
-        role: m.role === "user" ? "user" : "assistant",
-        content: m.text,
-      })),
-    ],
+    messages: chatMessages,
   });
 
   const encoder = new TextEncoder();
