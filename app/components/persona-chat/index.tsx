@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Send } from "lucide-react";
 
@@ -8,20 +9,20 @@ const PERSONAS = {
     id: "hitesh",
     name: "Hitesh",
     tagline: "Sharp, structured, strategic",
-    desc: "Breaks problems into steps and gets you to a plan fast.",
+    desc: "Retired from corporate and full time YouTuber, x founder of LCO (acquired), x CTO, Sr. Director at PW. 2 YT channels (1M & 700k+), stepped into 45 countries",
     accent: "#5B8DEF",
     accentDim: "rgba(91,141,239,0.16)",
-    photo: "/hitesh.jpg", // put the real photo in /public/hitesh.jpg
-    opener: "Hitesh here. What are we solving today?",
+    photo: "/hitesh.png", 
+    opener: "Hanji, Kaise hai ap?",
   },
   piyush: {
     id: "piyush",
     name: "Piyush",
     tagline: "Warm, bold, unfiltered",
-    desc: "Thinks out loud and pushes every idea a little further.",
+    desc: "Software Engineer | Tech Content Creator & YouTuber | 395k+ on YouTube | 25k+ Instagram | 110k+ LinkedIn",
     accent: "#D264E8",
     accentDim: "rgba(210,100,232,0.16)",
-    photo: "/piyush.jpg", // put the real photo in /public/piyush.jpg
+    photo: "/piyush.png", 
     opener: "Hey, it's Piyush. Say what's actually on your mind.",
   },
 };
@@ -239,9 +240,10 @@ export default function PersonaChat() {
       {screen !== "chat" && (
         <div className={`pc-pick-wrap ${selectingId ? "pc-exit" : ""}`}>
           <div>
-            <div className="pc-eyebrow">choose your guide</div>
+            <div className="pc-eyebrow">Choose your guide.</div>
             <div className="pc-headline">
-              Two minds.<br />One <span>glow</span> to think inside.
+              Different personalities.
+              <br/> The same <span>powerful intelligence.</span>
             </div>
           </div>
 
@@ -254,16 +256,19 @@ export default function PersonaChat() {
                   className={`pc-card pc-${p.id} ${state}`}
                   onClick={() => choosePersona(p.id)}
                 >
-                  <img
+                   <div className="pc-photo-fallback"></div>
+                  <Image
                     src={p.photo}
                     alt={p.name}
                     className="pc-photo-fill"
+                    width={260}
+                    height={380}
                     onError={(e) => { e.currentTarget.style.display = "none"; }}
                   />
-                  <div className="pc-photo-fallback">YOUR PHOTO<br />GOES HERE</div>
+                 
                   <div className="pc-card-overlay">
                     <div className="pc-card-name">{p.name}</div>
-                    <div className="pc-card-tagline">{p.tagline}</div>
+                    {/* <div className="pc-card-tagline">{p.tagline}</div> */}
                     <div className="pc-card-desc">{p.desc}</div>
                     <div className="pc-card-cta">tap to start →</div>
                   </div>
