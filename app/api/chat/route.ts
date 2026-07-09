@@ -8,7 +8,7 @@ type PersonaId = "hitesh" | "piyush";
 type ChatMessage = {
   role: "user" | "assistant";
   text: string;
-};
+}; 
 
 const SYSTEM_PROMPTS: Record<PersonaId, string> = {
   hitesh: `
